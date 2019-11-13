@@ -5,6 +5,10 @@ use core::marker::PhantomData;
 #[cfg(feature = "unproven")]
 use crate::hal::digital::v2::InputPin;
 use crate::hal::digital::v2::OutputPin;
+#[cfg(feature = "unproven")]
+use crate::hal::digital::v2::StatefulOutputPin;
+#[cfg(feature = "unproven")]
+use crate::hal::digital::v2::toggleable;
 use crate::rcc::AHB;
 
 /// Extension trait to split a GPIO peripheral in independent pins and registers
@@ -181,6 +185,30 @@ macro_rules! gpio {
             }
         }
 
+        #[cfg(feature = "unproven")]
+        impl <MODE> StatefulOutputPin for PXx<Output<MODE>> {
+            fn is_set_high(&self) -> Result<bool, Self::Error> {
+                self.is_set_low().map(|b| !b)
+            }
+
+            fn is_set_low(&self) -> Result<bool, Self::Error> {
+                // NOTE(unsafe) atomic read with no side effects
+                Ok(unsafe {
+                    match &self.gpio {
+                        $(
+                            #[cfg(any(
+                                $(feature = $device,)+
+                            ))]
+                            Gpio::$GPIOX => (*$GPIOX::ptr()).odr.read().bits() & (1 << self.i) == 0,
+                        )+
+                    }
+                })
+            }
+        }
+
+        #[cfg(feature = "unproven")]
+        impl <MODE> toggleable::Default for PXx<Output<MODE>> {}
+
         $(
             /// GPIO
             #[cfg(any(
@@ -192,6 +220,10 @@ macro_rules! gpio {
                 use crate::hal::digital::v2::OutputPin;
                 #[cfg(feature = "unproven")]
                 use crate::hal::digital::v2::InputPin;
+                #[cfg(feature = "unproven")]
+                use crate::hal::digital::v2::StatefulOutputPin;
+                #[cfg(feature = "unproven")]
+                use crate::hal::digital::v2::toggleable;
                 use crate::stm32::{$gpioy, $GPIOX};
 
                 use crate::rcc::AHB;
@@ -346,6 +378,21 @@ macro_rules! gpio {
                         Ok(unsafe { (*$GPIOX::ptr()).idr.read().bits() & (1 << self.i) == 0 })
                     }
                 }
+
+                #[cfg(feature = "unproven")]
+                impl<MODE> StatefulOutputPin for $PXx<Output<MODE>> {
+                    fn is_set_high(&self) -> Result<bool, Self::Error> {
+                        self.is_set_low().map(|b| !b)
+                    }
+
+                    fn is_set_low(&self) -> Result<bool, Self::Error> {
+                        // NOTE(unsafe) atomic read with no side effects
+                        Ok(unsafe { (*$GPIOX::ptr()).odr.read().bits() & (1 << self.i) == 0 })
+                    }
+                }
+
+                #[cfg(feature = "unproven")]
+                impl<MODE> toggleable::Default for $PXx<Output<MODE>> {}
 
                 $(
                     /// Pin
@@ -650,6 +697,21 @@ macro_rules! gpio {
                             Ok(unsafe { (*$GPIOX::ptr()).idr.read().bits() & (1 << $i) == 0 })
                         }
                     }
+
+                    #[cfg(feature = "unproven")]
+                    impl<MODE> StatefulOutputPin for $PXi<Output<MODE>> {
+                        fn is_set_high(&self) -> Result<bool, Self::Error> {
+                            self.is_set_low().map(|b| !b)
+                        }
+
+                        fn is_set_low(&self) -> Result<bool, Self::Error> {
+                            // NOTE(unsafe) atomic read with no side effects
+                            Ok(unsafe { (*$GPIOX::ptr()).odr.read().bits() & (1 << $i) == 0 })
+                        }
+                    }
+
+                    #[cfg(feature = "unproven")]
+                    impl<MODE> toggleable::Default for $PXi<Output<MODE>> {}
                 )+
             }
         )+
