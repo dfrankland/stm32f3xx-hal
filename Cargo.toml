@@ -32,6 +32,9 @@ version = "0.2.2"
 default-features = false
 version = "1.0.2"
 
+[dev-dependencies]
+panic-semihosting = "0.5.2"
+
 [features]
 default = ["unproven"]
 device-selected = []
@@ -56,3 +59,7 @@ lto = true
 debug = true
 lto = true
 opt-level = "s"
+
+[[example]]
+name = "toggle"
+required-features = ["rt", "stm32f303"]
