@@ -8,6 +8,29 @@ use cast::u32;
 use crate::flash::ACR;
 use crate::time::Hertz;
 
+macro_rules! dbg {
+    ($val:expr) => {
+        // Use of `match` here is intentional because it affects the lifetimes
+        // of temporaries - https://stackoverflow.com/a/48732525/1063961
+        match $val {
+            tmp => {
+                use core::fmt::Write;
+                let mut out = cortex_m_semihosting::hio::hstdout().unwrap();
+                writeln!(
+                    out,
+                    "[{}:{}] {} = {:#?}",
+                    file!(),
+                    line!(),
+                    stringify!($val),
+                    &tmp
+                )
+                .unwrap();
+                tmp
+            }
+        }
+    };
+}
+
 /// Extension trait that constrains the `RCC` peripheral
 pub trait RccExt {
     /// Constrains the `RCC` peripheral so it plays nicely with the other abstractions
@@ -133,6 +156,7 @@ mod usb_clocking {
 use self::usb_clocking::{has_usb, set_usbpre};
 
 /// Clock configuration
+#[derive(Debug)]
 pub struct CFGR {
     hse: Option<u32>,
     hclk: Option<u32>,
@@ -267,6 +291,8 @@ impl CFGR {
 
         let hclk = sysclk / (1 << (hpre_bits - 0b0111));
 
+        dbg!(hclk <= 72_000_000);
+
         assert!(hclk <= 72_000_000);
 
         let ppre1_bits = self
@@ -284,6 +310,8 @@ impl CFGR {
         let ppre1 = 1 << (ppre1_bits - 0b011);
         let pclk1 = hclk / u32(ppre1);
 
+        dbg!(pclk1 <= 36_000_000);
+
         assert!(pclk1 <= 36_000_000);
 
         let ppre2_bits = self
@@ -300,6 +328,8 @@ impl CFGR {
 
         let ppre2 = 1 << (ppre2_bits - 0b011);
         let pclk2 = hclk / u32(ppre2);
+
+        dbg!(pclk2 <= 72_000_000);
 
         assert!(pclk2 <= 72_000_000);
 
@@ -326,15 +356,23 @@ impl CFGR {
             _ => (true, false),
         };
 
+        dbg!((&usb_ok, &usbpre, &usbclk_valid));
+
         let rcc = unsafe { &*RCC::ptr() };
+
+        dbg!("try to enable hse");
 
         if self.hse.is_some() {
             // enable HSE and wait for it to be ready
 
             rcc.cr.modify(|_, w| w.hseon().set_bit());
 
+            dbg!("start waiting on hserdy");
             while rcc.cr.read().hserdy().bit_is_clear() {}
+            dbg!("hserdy is... ready");
         }
+
+        dbg!("try to enable PLL");
 
         if let Some((pllmul_bits, pllsrc)) = pll_options {
             // enable PLL and wait for it to be ready
@@ -343,8 +381,12 @@ impl CFGR {
 
             rcc.cr.modify(|_, w| w.pllon().set_bit());
 
+            dbg!("start waiting on pllrdy");
             while rcc.cr.read().pllrdy().bit_is_clear() {}
+            dbg!("pllrdy is... ready");
         }
+
+        dbg!("set prescalars");
 
         // set prescalers and clock source
         rcc.cfgr.modify(|_, w| unsafe {
@@ -368,6 +410,7 @@ impl CFGR {
                 })
         });
 
+        dbg!("all done!");
 
         Clocks {
             hclk: Hertz(hclk),
@@ -386,7 +429,7 @@ impl CFGR {
 /// Frozen clock frequencies
 ///
 /// The existence of this value indicates that the clock configuration can no longer be changed
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Clocks {
     hclk: Hertz,
     pclk1: Hertz,
