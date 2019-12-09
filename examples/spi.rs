@@ -38,7 +38,7 @@ fn main() -> ! {
         phase: Phase::CaptureOnFirstTransition,
     };
 
-    let _spi = Spi::spi1(
+    let mut spi = Spi::spi1(
         dp.SPI1,
         (sck, miso, mosi),
         spi_mode,
@@ -46,6 +46,20 @@ fn main() -> ! {
         clocks,
         &mut rcc.apb2,
     );
+
+    // Create an `u8` array, which can be transfered via SPI.
+    let msg_send: [u8; 8] = [0xD, 0xE, 0xA, 0xD, 0xB, 0xE, 0xE, 0xF];
+    // Clone the array, as it would be mutually shared in `transfer` while simultaniously would be
+    // immutable shared in `assert_eq`.
+    let mut msg_sending = msg_send.clone();
+    // Transfer the content of the array via SPI and receive it's output.
+    // When MOSI and MISO pins are connected together, `msg_received` should receive the content.
+    // from `msg_sending`
+    let msg_received = spi.transfer(&mut msg_sending).unwrap();
+
+    // Check, if msg_send and msg_received are identical.
+    // This succeeds, when master and slave of the SPI are connected.
+    assert_eq!(msg_send, msg_received);
 
     loop {}
 }
