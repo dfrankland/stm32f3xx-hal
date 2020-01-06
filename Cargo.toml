@@ -31,10 +31,6 @@ features = ["const-fn"]
 default-features = false
 version = "0.2.2"
 
-[dependencies.void]
-default-features = false
-version = "1.0.2"
-
 [dependencies.stm32-usbd]
 version = "0.5.0"
 optional = true

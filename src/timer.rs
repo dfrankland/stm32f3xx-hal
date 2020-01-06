@@ -1,6 +1,7 @@
 //! Timers
 
 use crate::hal::timer::{CountDown, Periodic};
+use crate::rcc::{Clocks, APB1, APB2};
 #[cfg(any(
     feature = "stm32f302",
     feature = "stm32f303",
@@ -54,13 +55,10 @@ use crate::stm32::{TIM15, TIM16, TIM17, TIM2, TIM6};
     feature = "stm32f398"
 ))]
 use crate::stm32::{TIM3, TIM7};
-
-use cast::{u16, u32};
-use nb;
-use void::Void;
-
-use crate::rcc::{Clocks, APB1, APB2};
 use crate::time::Hertz;
+use cast::{u16, u32};
+use core::convert::Infallible;
+use nb;
 
 /// Associated clocks with timers
 pub trait PclkSrc {
@@ -127,7 +125,7 @@ macro_rules! hal {
                     self.tim.cr1.modify(|_, w| w.cen().enabled());
                 }
 
-                fn wait(&mut self) -> nb::Result<(), Void> {
+                fn wait(&mut self) -> nb::Result<(), Infallible> {
                     if self.tim.sr.read().uif().is_clear() {
                         Err(nb::Error::WouldBlock)
                     } else {
